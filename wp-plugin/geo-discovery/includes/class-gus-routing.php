@@ -8,6 +8,7 @@ class Gus_Routing {
     private $resolver;
     private $renderer;
     private $seo;
+    private $is_geo_404 = false;
 
     public function __construct(Gus_Resolver $resolver, Gus_Renderer $renderer, Gus_SEO $seo) {
         $this->resolver = $resolver;
@@ -19,6 +20,7 @@ class Gus_Routing {
         add_action('init', array($this, 'register_routes'));
         add_filter('query_vars', array($this, 'register_query_vars'));
         add_action('template_redirect', array($this, 'handle_request'));
+        add_filter('template_include', array($this, 'filter_template'), 99);
     }
 
     public static function register_rewrite_rules() {
@@ -72,11 +74,14 @@ class Gus_Routing {
         }
 
         if ($route === 'entity') {
-            $this->handle_entity_route();
-            exit;
+            if ($this->handle_entity_route()) {
+                exit;
+            }
+            return;
         }
 
         $this->render_404();
+        return;
     }
 
     private function handle_entity_route() {
@@ -86,33 +91,34 @@ class Gus_Routing {
 
         if (empty($post_type) || empty($slug) || empty($tier)) {
             $this->render_404();
-            return;
+            return false;
         }
 
         $enabled_post_types = $this->get_enabled_post_types();
         if (!in_array($post_type, $enabled_post_types, true)) {
             $this->render_404();
-            return;
+            return false;
         }
 
         $entity = $this->resolver->get_entity($post_type, $slug);
         if (!$entity) {
             $this->render_404();
-            return;
+            return false;
         }
 
         if (!$this->resolver->passes_governance($entity)) {
             $this->render_404();
-            return;
+            return false;
         }
 
         $enabled_tiers = $this->resolver->get_enabled_tiers($entity);
         if (!in_array($tier, $enabled_tiers, true)) {
             $this->render_404();
-            return;
+            return false;
         }
 
         $this->renderer->render_entity($entity, $tier);
+        return true;
     }
 
     private function render_404() {
@@ -121,17 +127,8 @@ class Gus_Routing {
         status_header(404);
         nocache_headers();
         if ($this->is_geo_request_path()) {
-            $discover_url = home_url('/' . $this->get_geo_base() . '/discover/');
-            get_header();
-            echo '<main id="gus-geo-404" class="gus-geo-404">';
-            echo '<h1>' . esc_html__('Page not found', 'geo-discovery') . '</h1>';
-            echo '<p>' . sprintf(
-                esc_html__('GEO page not available. Visit %s.', 'geo-discovery'),
-                '<a href="' . esc_url($discover_url) . '">' . esc_html($discover_url) . '</a>'
-            ) . '</p>';
-            echo '</main>';
-            get_footer();
-            exit;
+            $this->is_geo_404 = true;
+            return;
         }
 
         include get_404_template();
@@ -173,5 +170,18 @@ class Gus_Routing {
         $prefix = '/' . trailingslashit($base);
 
         return strpos($path, $prefix) === 0;
+    }
+
+    public function filter_template($template) {
+        if (!$this->is_geo_404) {
+            return $template;
+        }
+
+        $geo_template = trailingslashit(GUS_PLUGIN_DIR) . 'templates/geo-404.php';
+        if (file_exists($geo_template)) {
+            return $geo_template;
+        }
+
+        return $template;
     }
 }
