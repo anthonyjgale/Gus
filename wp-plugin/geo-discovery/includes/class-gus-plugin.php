@@ -6,35 +6,43 @@ if (!defined('ABSPATH')) {
 
 class Gus_Plugin {
     private $routing;
-    private $resolver;
     private $renderer;
+    private $resolver;
     private $seo;
-
-    public function __construct() {
-        $this->resolver = new Gus_Resolver();
-        $this->renderer = new Gus_Renderer();
-        $this->seo = new Gus_Seo();
-        $this->routing = new Gus_Routing($this->resolver, $this->renderer, $this->seo);
-    }
+    private $admin;
 
     public function init() {
-        add_action('init', array($this->routing, 'register_routes'));
-        add_filter('query_vars', array($this->routing, 'register_query_vars'));
-        add_action('template_redirect', array($this->routing, 'handle_request'));
-        add_filter('wp_robots', array($this->seo, 'filter_robots'));
+        $this->seo = new Gus_SEO();
+        $this->resolver = new Gus_Resolver();
+        $this->renderer = new Gus_Renderer($this->seo);
+        $this->routing = new Gus_Routing($this->resolver, $this->renderer, $this->seo);
+
+        $this->routing->init();
+
+        if (is_admin()) {
+            $this->admin = new Gus_Admin($this->routing);
+            $this->admin->init();
+        }
     }
 
     public static function activate() {
-        if (get_option(Gus_Utils::OPTION_BASE, null) === null) {
-            add_option(Gus_Utils::OPTION_BASE, 'geo');
+        if (false === get_option('gus_geo_base')) {
+            add_option('gus_geo_base', 'geo');
         }
 
-        if (get_option(Gus_Utils::OPTION_ENABLED_POST_TYPES, null) === null) {
-            add_option(Gus_Utils::OPTION_ENABLED_POST_TYPES, Gus_Utils::get_public_post_types());
+        if (false === get_option('gus_public_geo_enabled')) {
+            add_option('gus_public_geo_enabled', true);
         }
 
-        $routing = new Gus_Routing(new Gus_Resolver(), new Gus_Renderer(), new Gus_Seo());
-        $routing->register_routes();
+        if (false === get_option('gus_geo_enabled_post_types')) {
+            add_option('gus_geo_enabled_post_types', array('post'));
+        }
+
+        Gus_Routing::register_rewrite_rules();
+        flush_rewrite_rules();
+    }
+
+    public static function deactivate() {
         flush_rewrite_rules();
     }
 }

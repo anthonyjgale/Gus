@@ -5,64 +5,30 @@ if (!defined('ABSPATH')) {
 }
 
 class Gus_Resolver {
-    public function resolve_entity($post_type, $slug) {
-        $post_type = sanitize_key($post_type);
-        $slug = sanitize_title($slug);
-
-        if (!$this->is_post_type_allowed($post_type)) {
+    public function get_entity($post_type, $slug) {
+        $post = get_page_by_path($slug, OBJECT, $post_type);
+        if (!$post || $post->post_type !== $post_type) {
             return null;
         }
 
-        $posts = get_posts(
-            array(
-                'name' => $slug,
-                'post_type' => $post_type,
-                'post_status' => 'publish',
-                'numberposts' => 1,
-            )
-        );
-
-        if (empty($posts)) {
-            return null;
-        }
-
-        return $posts[0];
+        return $post;
     }
 
-    public function passes_governance($post_id) {
-        $enabled = get_post_meta($post_id, Gus_Utils::META_ENABLED, true);
-        $status = get_post_meta($post_id, Gus_Utils::META_STATUS, true);
-
-        return (string) $enabled === '1' && $status === Gus_Utils::STATUS_PUBLISHED;
+    public function is_entity_enabled(WP_Post $post) {
+        return (bool) get_post_meta($post->ID, '_gus_enabled', true);
     }
 
-    public function get_blocks($post, $tier) {
-        $meta_key = Gus_Utils::get_blocks_meta_key($tier);
-        $blocks = get_post_meta($post->ID, $meta_key, true);
-
-        if (is_string($blocks)) {
-            $decoded = json_decode($blocks, true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $blocks = $decoded;
-            }
-        }
-
-        if (empty($blocks)) {
-            $blocks = Gus_Utils::build_placeholder_blocks($post, $tier);
-            update_post_meta($post->ID, $meta_key, $blocks);
-        }
-
-        return $blocks;
+    public function is_entity_published(WP_Post $post) {
+        $status = get_post_meta($post->ID, '_gus_status', true);
+        return $status === 'published';
     }
 
-    private function is_post_type_allowed($post_type) {
-        $post_type_object = get_post_type_object($post_type);
-        if (!$post_type_object || !$post_type_object->public) {
-            return false;
+    public function is_tier_enabled(WP_Post $post, $tier) {
+        $tiers = get_post_meta($post->ID, '_gus_tiers_enabled', true);
+        if (!is_array($tiers)) {
+            $tiers = array();
         }
 
-        $enabled = Gus_Utils::get_enabled_post_types();
-
-        return in_array($post_type, $enabled, true);
+        return in_array($tier, $tiers, true);
     }
 }

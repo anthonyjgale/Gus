@@ -9,97 +9,142 @@ class Gus_Routing {
     private $renderer;
     private $seo;
 
-    public function __construct(Gus_Resolver $resolver, Gus_Renderer $renderer, Gus_Seo $seo) {
+    public function __construct(Gus_Resolver $resolver, Gus_Renderer $renderer, Gus_SEO $seo) {
         $this->resolver = $resolver;
         $this->renderer = $renderer;
         $this->seo = $seo;
     }
 
-    public function register_query_vars($vars) {
-        $vars[] = 'gus_geo';
-        $vars[] = 'gus_route';
-        $vars[] = 'gus_post_type';
-        $vars[] = 'gus_slug';
-        $vars[] = 'gus_tier';
+    public function init() {
+        add_action('init', array($this, 'register_routes'));
+        add_filter('query_vars', array($this, 'register_query_vars'));
+        add_action('template_redirect', array($this, 'handle_request'));
+    }
 
-        return $vars;
+    public static function register_rewrite_rules() {
+        $base = trim((string) get_option('gus_geo_base', 'geo'), '/');
+        $base = $base === '' ? 'geo' : $base;
+
+        add_rewrite_tag('%gus_geo%', '([^&]+)');
+        add_rewrite_tag('%gus_geo_type%', '([^&]+)');
+        add_rewrite_tag('%gus_geo_slug%', '([^&]+)');
+        add_rewrite_tag('%gus_geo_tier%', '([^&]+)');
+
+        add_rewrite_rule(
+            '^' . $base . '/discover/?$',
+            'index.php?gus_geo=discover',
+            'top'
+        );
+
+        add_rewrite_rule(
+            '^' . $base . '/([^/]+)/([^/]+)/([^/]+)/?$',
+            'index.php?gus_geo=entity&gus_geo_type=$matches[1]&gus_geo_slug=$matches[2]&gus_geo_tier=$matches[3]',
+            'top'
+        );
     }
 
     public function register_routes() {
-        $base = Gus_Utils::get_geo_base();
-        $base_regex = preg_quote($base, '/');
+        self::register_rewrite_rules();
+    }
 
-        add_rewrite_rule(
-            '^' . $base_regex . '/?$','index.php?gus_geo=1&gus_route=base',
-            'top'
-        );
-
-        add_rewrite_rule(
-            '^' . $base_regex . '/discover/?$','index.php?gus_geo=1&gus_route=discover',
-            'top'
-        );
-
-        add_rewrite_rule(
-            '^' . $base_regex . '/([^/]+)/([^/]+)/((?:broad|mid|ultra))/?$',
-            'index.php?gus_geo=1&gus_route=entity&gus_post_type=$matches[1]&gus_slug=$matches[2]&gus_tier=$matches[3]',
-            'top'
-        );
+    public function register_query_vars($vars) {
+        $vars[] = 'gus_geo';
+        $vars[] = 'gus_geo_type';
+        $vars[] = 'gus_geo_slug';
+        $vars[] = 'gus_geo_tier';
+        return $vars;
     }
 
     public function handle_request() {
-        if (!Gus_Utils::is_geo_request()) {
+        $route = get_query_var('gus_geo');
+        if (empty($route)) {
             return;
         }
 
-        $route = get_query_var('gus_route');
-
-        if ($route === 'base') {
-            wp_safe_redirect(Gus_Utils::get_discover_url(), 301);
-            exit;
+        if (!$this->is_public_geo_enabled()) {
+            $this->render_404();
+            return;
         }
 
         if ($route === 'discover') {
-            $this->seo->set_canonical_url(Gus_Utils::get_discover_url());
             $this->renderer->render_discover();
+            exit;
         }
 
         if ($route === 'entity') {
-            $tier = get_query_var('gus_tier');
-            $post_type = get_query_var('gus_post_type');
-            $slug = get_query_var('gus_slug');
-
-            if (!Gus_Utils::is_valid_tier($tier)) {
-                $this->render_404();
-            }
-
-            $post = $this->resolver->resolve_entity($post_type, $slug);
-            if (!$post) {
-                $this->render_404();
-            }
-
-            if (!$this->resolver->passes_governance($post->ID)) {
-                $this->render_404();
-            }
-
-            $geo_url = Gus_Utils::get_geo_url($post_type, $slug, $tier);
-            $this->seo->set_canonical_url($geo_url);
-            $this->renderer->render_geo_page($post, $tier);
+            $this->handle_entity_route();
+            exit;
         }
+
+        $this->render_404();
+    }
+
+    private function handle_entity_route() {
+        $post_type = sanitize_key(get_query_var('gus_geo_type'));
+        $slug = sanitize_title(get_query_var('gus_geo_slug'));
+        $tier = sanitize_key(get_query_var('gus_geo_tier'));
+
+        if (empty($post_type) || empty($slug) || empty($tier)) {
+            $this->render_404();
+            return;
+        }
+
+        $enabled_post_types = $this->get_enabled_post_types();
+        if (!in_array($post_type, $enabled_post_types, true)) {
+            $this->render_404();
+            return;
+        }
+
+        $entity = $this->resolver->get_entity($post_type, $slug);
+        if (!$entity) {
+            $this->render_404();
+            return;
+        }
+
+        if (!$this->resolver->is_entity_enabled($entity)) {
+            $this->render_404();
+            return;
+        }
+
+        if (!$this->resolver->is_entity_published($entity)) {
+            $this->render_404();
+            return;
+        }
+
+        if (!$this->resolver->is_tier_enabled($entity, $tier)) {
+            $this->render_404();
+            return;
+        }
+
+        $this->renderer->render_entity($entity, $tier);
     }
 
     private function render_404() {
         global $wp_query;
-
         $wp_query->set_404();
         status_header(404);
         nocache_headers();
-        $template = get_404_template();
-
-        if ($template) {
-            include $template;
-        } else {
-            include get_query_template('404');
-        }
+        include get_404_template();
         exit;
+    }
+
+    public function get_geo_base() {
+        $base = trim((string) get_option('gus_geo_base', 'geo'), '/');
+        return $base === '' ? 'geo' : $base;
+    }
+
+    public function get_enabled_post_types() {
+        $post_types = get_option('gus_geo_enabled_post_types', array('post'));
+        if (!is_array($post_types)) {
+            $post_types = array('post');
+        }
+
+        return array_values(array_filter($post_types, static function ($post_type) {
+            return is_string($post_type) && $post_type !== '';
+        }));
+    }
+
+    private function is_public_geo_enabled() {
+        return (bool) get_option('gus_public_geo_enabled', true);
     }
 }

@@ -1,48 +1,42 @@
 <?php
-
 if (!defined('ABSPATH')) {
     exit;
 }
-
 get_header();
 ?>
 <main class="gus-geo-discover">
     <section>
         <h1>GEO Discover</h1>
-        <p>Browse GEO discovery pages for enabled entities.</p>
+        <p>Browse published GEO entities.</p>
     </section>
-
-    <?php if (empty($context['entities'])) : ?>
-        <section>
-            <p>No published GEO entities are available yet.</p>
-        </section>
-    <?php else : ?>
-        <section>
+    <section>
+        <?php if (empty($posts)) : ?>
+            <p>No entities are currently published.</p>
+        <?php else : ?>
             <ul>
-                <?php foreach ($context['entities'] as $entity) : ?>
+                <?php foreach ($posts as $post) : ?>
                     <?php
-                    $tiers = Gus_Utils::get_enabled_tiers($entity->ID);
-                    $post_type_object = get_post_type_object($entity->post_type);
-                    $post_type_label = $post_type_object ? $post_type_object->labels->singular_name : $entity->post_type;
+                    $tiers = get_post_meta($post->ID, '_gus_tiers_enabled', true);
+                    if (!is_array($tiers)) {
+                        $tiers = array();
+                    }
                     ?>
                     <li>
-                        <strong><?php echo esc_html($entity->post_title); ?></strong>
-                        <span>(<?php echo esc_html($post_type_label); ?>)</span>
-                        <ul>
+                        <strong><?php echo esc_html($post->post_title); ?></strong>
+                        <div>
                             <?php foreach ($tiers as $tier) : ?>
-                                <?php $geo_url = Gus_Utils::get_geo_url($entity->post_type, $entity->post_name, $tier); ?>
-                                <li>
-                                    <a href="<?php echo esc_url($geo_url); ?>">
-                                        <?php echo esc_html(ucfirst($tier)); ?>
+                                <?php if (isset($tier_labels[$tier])) : ?>
+                                    <a href="<?php echo esc_url(home_url('/' . $geo_base . '/' . $post->post_type . '/' . $post->post_name . '/' . $tier . '/')); ?>">
+                                        <?php echo esc_html($tier_labels[$tier]); ?>
                                     </a>
-                                </li>
+                                <?php endif; ?>
                             <?php endforeach; ?>
-                        </ul>
+                        </div>
                     </li>
                 <?php endforeach; ?>
             </ul>
-        </section>
-    <?php endif; ?>
+        <?php endif; ?>
+    </section>
 </main>
 <?php
 get_footer();
