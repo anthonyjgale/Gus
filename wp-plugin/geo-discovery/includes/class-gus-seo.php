@@ -19,6 +19,7 @@ class Gus_SEO {
     }
 
     public function set_canonical_url($url) {
+        remove_action('wp_head', array($this, 'output_canonical'), 10);
         if (!$this->is_geo_route()) {
             return;
         }

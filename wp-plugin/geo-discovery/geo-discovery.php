@@ -21,6 +21,7 @@ require_once GUS_PLUGIN_DIR . 'includes/class-gus-admin.php';
 require_once GUS_PLUGIN_DIR . 'includes/class-gus-plugin.php';
 
 function gus_bootstrap_plugin() {
+    load_plugin_textdomain('geo-discovery', false, dirname(plugin_basename(__FILE__)) . '/languages');
     $plugin = new Gus_Plugin();
     $plugin->init();
 }
