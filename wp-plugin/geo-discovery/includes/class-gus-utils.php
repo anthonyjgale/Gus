@@ -5,6 +5,11 @@ if (!defined('ABSPATH')) {
 }
 
 class Gus_Utils {
+    const META_GROUNDING_PREFIX = '_gus_grounding_';
+    const META_LAST_GENERATED_PREFIX = '_gus_last_generated_';
+    const META_GENERATION_VERSION = '_gus_generation_version';
+    const META_SOURCE_URLS_PREFIX = '_gus_source_urls_';
+
     public static function build_placeholder_blocks(WP_Post $post, $tier) {
         $tier_label = ucfirst($tier);
         return array(
