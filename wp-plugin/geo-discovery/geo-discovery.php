@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
 
 define('GUS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 require_once GUS_PLUGIN_DIR . 'includes/class-gus-utils.php';
+require_once GUS_PLUGIN_DIR . 'includes/class-gus-generator.php';
 require_once GUS_PLUGIN_DIR . 'includes/class-gus-seo.php';
 require_once GUS_PLUGIN_DIR . 'includes/class-gus-resolver.php';
 require_once GUS_PLUGIN_DIR . 'includes/class-gus-renderer.php';

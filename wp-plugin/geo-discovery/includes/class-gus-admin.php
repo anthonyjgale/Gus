@@ -44,6 +44,15 @@ class Gus_Admin {
             'gus-entities',
             array($this, 'render_entities_page')
         );
+
+        add_submenu_page(
+            'gus-settings',
+            'GUS Receipts',
+            'Receipts',
+            'manage_options',
+            'gus-receipts',
+            array($this, 'render_receipts_page')
+        );
     }
 
     public function register_settings() {
@@ -155,12 +164,13 @@ class Gus_Admin {
                                 <?php
                                 $enabled = (bool) get_post_meta($entity->ID, '_gus_enabled', true);
                                 $status = get_post_meta($entity->ID, '_gus_status', true);
-                                $status = in_array($status, array('draft', 'published'), true) ? $status : 'draft';
+                                $status = in_array($status, array('draft', 'published', 'needs_review'), true) ? $status : 'draft';
                                 $tiers = get_post_meta($entity->ID, '_gus_tiers_enabled', true);
                                 if (!is_array($tiers)) {
                                     $tiers = array();
                                 }
                                 $preview_links = $this->get_preview_links($entity, $tiers, $status, $geo_base, $tier_labels);
+                                $receipts_links = $this->get_receipts_links($entity, $tiers, $tier_labels);
                                 ?>
                                 <tr>
                                     <td>
@@ -177,6 +187,7 @@ class Gus_Admin {
                                         <select name="entities[<?php echo esc_attr($entity->ID); ?>][status]">
                                             <option value="draft" <?php selected($status, 'draft'); ?>>Draft</option>
                                             <option value="published" <?php selected($status, 'published'); ?>>Published</option>
+                                            <option value="needs_review" <?php selected($status, 'needs_review'); ?>>Needs review</option>
                                         </select>
                                     </td>
                                     <td>
@@ -192,6 +203,11 @@ class Gus_Admin {
                                         <?php if (!empty($preview_links)) : ?>
                                             <div style="margin-top:8px;">
                                                 <?php echo wp_kses_post($preview_links); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <?php if (!empty($receipts_links)) : ?>
+                                            <div style="margin-top:8px;">
+                                                <?php echo wp_kses_post($receipts_links); ?>
                                             </div>
                                         <?php endif; ?>
                                     </td>
@@ -302,6 +318,33 @@ class Gus_Admin {
         return implode('<br />', $links);
     }
 
+    private function get_receipts_links(WP_Post $post, $tiers, $tier_labels) {
+        if (empty($tiers)) {
+            return '';
+        }
+
+        $links = array();
+        $nonce = wp_create_nonce('gus_receipts_view');
+        foreach ($tiers as $tier) {
+            if (!isset($tier_labels[$tier])) {
+                continue;
+            }
+
+            $url = add_query_arg(
+                array(
+                    'page' => 'gus-receipts',
+                    'post_id' => $post->ID,
+                    'tier' => $tier,
+                    '_wpnonce' => $nonce,
+                ),
+                admin_url('admin.php')
+            );
+            $links[] = '<a href="' . esc_url($url) . '">Receipts (' . esc_html($tier_labels[$tier]) . ')</a>';
+        }
+
+        return implode('<br />', $links);
+    }
+
     private function handle_entities_submission() {
         if (!isset($_POST['gus_entities_nonce'])) {
             return;
@@ -323,7 +366,8 @@ class Gus_Admin {
             }
 
             $enabled = !empty($data['enabled']) ? 1 : 0;
-            $status = isset($data['status']) && in_array($data['status'], array('draft', 'published'), true) ? $data['status'] : 'draft';
+            $current_status = get_post_meta($post_id, '_gus_status', true);
+            $status = isset($data['status']) && in_array($data['status'], array('draft', 'published', 'needs_review'), true) ? $data['status'] : 'draft';
             $tiers = array();
 
             if (isset($data['tiers']) && is_array($data['tiers'])) {
@@ -334,19 +378,97 @@ class Gus_Admin {
                 }
             }
 
+            if ($generate_post_id === $post_id && $current_status === 'published') {
+                $status = 'needs_review';
+            }
+
             update_post_meta($post_id, '_gus_enabled', $enabled);
             update_post_meta($post_id, '_gus_status', $status);
             update_post_meta($post_id, '_gus_tiers_enabled', $tiers);
 
             if ($generate_post_id === $post_id) {
-                $post = get_post($post_id);
-                if ($post) {
-                    foreach ($tiers as $tier) {
-                        $blocks = Gus_Utils::build_placeholder_blocks($post, $tier);
-                        update_post_meta($post_id, '_gus_blocks_' . $tier, $blocks);
-                    }
+                foreach ($tiers as $tier) {
+                    Gus_Generator::generate($post_id, $tier);
                 }
             }
         }
+    }
+
+    public function render_receipts_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $post_id = isset($_GET['post_id']) ? absint($_GET['post_id']) : 0;
+        $tier = isset($_GET['tier']) ? sanitize_key($_GET['tier']) : '';
+        $valid_tiers = array_keys(Gus_Utils::get_tier_labels());
+        $nonce_valid = isset($_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'gus_receipts_view');
+
+        ?>
+        <div class="wrap">
+            <h1>GUS Receipts</h1>
+            <?php
+            if (!$post_id || !in_array($tier, $valid_tiers, true) || !$nonce_valid) {
+                echo '<p>Select an entity and tier from the Entities screen to view receipts.</p>';
+                echo '</div>';
+                return;
+            }
+
+            $post = get_post($post_id);
+            if (!$post) {
+                echo '<p>Entity not found.</p>';
+                echo '</div>';
+                return;
+            }
+
+            $grounding = get_post_meta($post_id, Gus_Utils::META_GROUNDING_PREFIX . $tier, true);
+            $source_urls = get_post_meta($post_id, Gus_Utils::META_SOURCE_URLS_PREFIX . $tier, true);
+            $last_generated = get_post_meta($post_id, Gus_Utils::META_LAST_GENERATED_PREFIX . $tier, true);
+            $generation_version = get_post_meta($post_id, Gus_Utils::META_GENERATION_VERSION, true);
+
+            if (!is_array($source_urls)) {
+                $source_urls = array();
+            }
+
+            $last_generated_label = 'Not generated';
+            if (!empty($last_generated)) {
+                $format = get_option('date_format') . ' ' . get_option('time_format');
+                $last_generated_label = date_i18n($format, (int) $last_generated);
+            }
+
+            $grounding_notes = '';
+            $block_sources = array();
+            if (is_array($grounding)) {
+                $grounding_notes = isset($grounding['notes']) ? (string) $grounding['notes'] : '';
+                $block_sources = isset($grounding['block_sources']) && is_array($grounding['block_sources']) ? $grounding['block_sources'] : array();
+            }
+            ?>
+            <h2><?php echo esc_html($post->post_title); ?> <small>(<?php echo esc_html($post->post_type); ?>)</small></h2>
+            <p><strong>Tier:</strong> <?php echo esc_html($tier); ?></p>
+            <p><strong>Last generated:</strong> <?php echo esc_html($last_generated_label); ?></p>
+            <p><strong>Generation version:</strong> <?php echo esc_html($generation_version ? $generation_version : 'Unknown'); ?></p>
+
+            <h3>Source URLs</h3>
+            <?php if (!empty($source_urls)) : ?>
+                <ul>
+                    <?php foreach ($source_urls as $url) : ?>
+                        <li><a href="<?php echo esc_url($url); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($url); ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php else : ?>
+                <p>No source URLs stored.</p>
+            <?php endif; ?>
+
+            <h3>Grounding Notes</h3>
+            <p><?php echo esc_html($grounding_notes !== '' ? $grounding_notes : 'No grounding notes available.'); ?></p>
+
+            <h3>Block Sources</h3>
+            <?php if (!empty($block_sources)) : ?>
+                <pre><?php echo esc_html(wp_json_encode($block_sources, JSON_PRETTY_PRINT)); ?></pre>
+            <?php else : ?>
+                <p>No receipts in placeholder mode.</p>
+            <?php endif; ?>
+        </div>
+        <?php
     }
 }
