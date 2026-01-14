@@ -19,7 +19,6 @@ class Gus_Routing {
         add_action('init', array($this, 'register_routes'));
         add_filter('query_vars', array($this, 'register_query_vars'));
         add_action('template_redirect', array($this, 'handle_request'));
-        add_filter('the_content', array($this, 'add_geo_404_notice'));
     }
 
     public static function register_rewrite_rules() {
@@ -38,7 +37,7 @@ class Gus_Routing {
         );
 
         add_rewrite_rule(
-            '^' . $base . '/([^/]+)/([^/]+)/([^/]+)/?$',
+            '^' . $base . '/([^/]+)/([^/]+)/((?:broad|mid|ultra))/?$',
             'index.php?gus_geo=entity&gus_geo_type=$matches[1]&gus_geo_slug=$matches[2]&gus_geo_tier=$matches[3]',
             'top'
         );
@@ -121,19 +120,22 @@ class Gus_Routing {
         $wp_query->set_404();
         status_header(404);
         nocache_headers();
-        include get_404_template();
-        exit;
-    }
-
-    public function add_geo_404_notice($content) {
-        if (!is_404() || !$this->is_geo_request_path()) {
-            return $content;
+        if ($this->is_geo_request_path()) {
+            $discover_url = home_url('/' . $this->get_geo_base() . '/discover/');
+            get_header();
+            echo '<main id="gus-geo-404" class="gus-geo-404">';
+            echo '<h1>' . esc_html__('Page not found', 'geo-discovery') . '</h1>';
+            echo '<p>' . sprintf(
+                esc_html__('GEO page not available. Visit %s.', 'geo-discovery'),
+                '<a href="' . esc_url($discover_url) . '">' . esc_html($discover_url) . '</a>'
+            ) . '</p>';
+            echo '</main>';
+            get_footer();
+            exit;
         }
 
-        $discover_url = home_url('/' . $this->get_geo_base() . '/discover/');
-        $notice = '<p>GEO page not available. Visit <a href="' . esc_url($discover_url) . '">' . esc_html($discover_url) . '</a></p>';
-
-        return $content . $notice;
+        include get_404_template();
+        exit;
     }
 
     public function get_geo_base() {

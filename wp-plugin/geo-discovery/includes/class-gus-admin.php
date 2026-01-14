@@ -430,23 +430,37 @@ class Gus_Admin {
                 $source_urls = array();
             }
 
-            $last_generated_label = 'Not generated';
-            if (!empty($last_generated)) {
-                $format = get_option('date_format') . ' ' . get_option('time_format');
-                $last_generated_label = date_i18n($format, (int) $last_generated);
+            $format = get_option('date_format') . ' ' . get_option('time_format');
+            $last_generated_label = !empty($last_generated) ? date_i18n($format, (int) $last_generated) : 'Not generated';
+
+            $mode = 'Not generated';
+            $generated_at_label = 'Not generated';
+            $grounding_notes = '';
+            $block_sources = null;
+
+            if (is_array($grounding)) {
+                if (!empty($grounding['mode'])) {
+                    $mode = (string) $grounding['mode'];
+                }
+
+                if (!empty($grounding['generated_at'])) {
+                    $generated_at_label = date_i18n($format, (int) $grounding['generated_at']);
+                }
+
+                $grounding_notes = isset($grounding['notes']) ? (string) $grounding['notes'] : '';
+                if (isset($grounding['block_sources']) && is_array($grounding['block_sources'])) {
+                    $block_sources = $grounding['block_sources'];
+                }
             }
 
-            $grounding_notes = '';
-            $block_sources = array();
-            if (is_array($grounding)) {
-                $grounding_notes = isset($grounding['notes']) ? (string) $grounding['notes'] : '';
-                $block_sources = isset($grounding['block_sources']) && is_array($grounding['block_sources']) ? $grounding['block_sources'] : array();
-            }
+            $generation_version_label = !empty($generation_version) ? $generation_version : 'Not generated';
             ?>
             <h2><?php echo esc_html($post->post_title); ?> <small>(<?php echo esc_html($post->post_type); ?>)</small></h2>
             <p><strong>Tier:</strong> <?php echo esc_html($tier); ?></p>
+            <p><strong>Mode:</strong> <?php echo esc_html($mode); ?></p>
+            <p><strong>Generated at:</strong> <?php echo esc_html($generated_at_label); ?></p>
             <p><strong>Last generated:</strong> <?php echo esc_html($last_generated_label); ?></p>
-            <p><strong>Generation version:</strong> <?php echo esc_html($generation_version ? $generation_version : 'Unknown'); ?></p>
+            <p><strong>Generation version:</strong> <?php echo esc_html($generation_version_label); ?></p>
 
             <h3>Source URLs</h3>
             <?php if (!empty($source_urls)) : ?>
@@ -456,17 +470,17 @@ class Gus_Admin {
                     <?php endforeach; ?>
                 </ul>
             <?php else : ?>
-                <p>No source URLs stored.</p>
+                <p>Not generated.</p>
             <?php endif; ?>
 
             <h3>Grounding Notes</h3>
             <p><?php echo esc_html($grounding_notes !== '' ? $grounding_notes : 'No grounding notes available.'); ?></p>
 
             <h3>Block Sources</h3>
-            <?php if (!empty($block_sources)) : ?>
+            <?php if (is_array($block_sources)) : ?>
                 <pre><?php echo esc_html(wp_json_encode($block_sources, JSON_PRETTY_PRINT)); ?></pre>
             <?php else : ?>
-                <p>No receipts in placeholder mode.</p>
+                <p>Not generated.</p>
             <?php endif; ?>
         </div>
         <?php

@@ -58,6 +58,7 @@ class Gus_Renderer {
         $geo_base = $this->get_geo_base();
 
         include GUS_PLUGIN_DIR . 'templates/discover.php';
+        exit;
     }
 
     public function render_entity(WP_Post $post, $tier) {
@@ -76,6 +77,7 @@ class Gus_Renderer {
         $geo_base = $this->get_geo_base();
 
         include GUS_PLUGIN_DIR . 'templates/geo-page.php';
+        exit;
     }
 
     private function get_geo_base() {
