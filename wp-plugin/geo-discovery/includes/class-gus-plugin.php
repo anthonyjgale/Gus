@@ -18,6 +18,7 @@ class Gus_Plugin {
         $this->routing = new Gus_Routing($this->resolver, $this->renderer, $this->seo);
 
         $this->routing->init();
+        add_filter('wp_robots', array($this->seo, 'filter_robots'));
 
         if (is_admin()) {
             $this->admin = new Gus_Admin($this->routing);

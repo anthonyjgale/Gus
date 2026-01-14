@@ -7,11 +7,19 @@ if (!defined('ABSPATH')) {
 class Gus_SEO {
     private $canonical_url;
 
-    public function set_canonical_url($url) {
-        remove_action('wp_head', array($this, 'output_canonical'), 10);
-
+    public function filter_robots($robots) {
         if (!$this->is_geo_route()) {
-            $this->canonical_url = null;
+            return $robots;
+        }
+
+        $robots['noindex'] = true;
+        $robots['follow'] = true;
+
+        return $robots;
+    }
+
+    public function set_canonical_url($url) {
+        if (!$this->is_geo_route()) {
             return;
         }
 
@@ -26,7 +34,6 @@ class Gus_SEO {
         }
 
         echo '<link rel="canonical" href="' . esc_url($this->canonical_url) . '" />' . "\n";
-        echo '<meta name="robots" content="noindex,follow" />' . "\n";
     }
 
     private function is_geo_route() {
