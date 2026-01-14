@@ -19,6 +19,7 @@ class Gus_Routing {
         add_action('init', array($this, 'register_routes'));
         add_filter('query_vars', array($this, 'register_query_vars'));
         add_action('template_redirect', array($this, 'handle_request'));
+        add_filter('the_content', array($this, 'add_geo_404_notice'));
     }
 
     public static function register_rewrite_rules() {
@@ -101,17 +102,13 @@ class Gus_Routing {
             return;
         }
 
-        if (!$this->resolver->is_entity_enabled($entity)) {
+        if (!$this->resolver->passes_governance($entity)) {
             $this->render_404();
             return;
         }
 
-        if (!$this->resolver->is_entity_published($entity)) {
-            $this->render_404();
-            return;
-        }
-
-        if (!$this->resolver->is_tier_enabled($entity, $tier)) {
+        $enabled_tiers = $this->resolver->get_enabled_tiers($entity);
+        if (!in_array($tier, $enabled_tiers, true)) {
             $this->render_404();
             return;
         }
@@ -126,6 +123,17 @@ class Gus_Routing {
         nocache_headers();
         include get_404_template();
         exit;
+    }
+
+    public function add_geo_404_notice($content) {
+        if (!is_404() || !$this->is_geo_request_path()) {
+            return $content;
+        }
+
+        $discover_url = home_url('/' . $this->get_geo_base() . '/discover/');
+        $notice = '<p>GEO page not available. Visit <a href="' . esc_url($discover_url) . '">' . esc_html($discover_url) . '</a></p>';
+
+        return $content . $notice;
     }
 
     public function get_geo_base() {
@@ -146,5 +154,22 @@ class Gus_Routing {
 
     private function is_public_geo_enabled() {
         return (bool) get_option('gus_public_geo_enabled', true);
+    }
+
+    private function is_geo_request_path() {
+        $path = '';
+        if (isset($_SERVER['REQUEST_URI'])) {
+            $path = wp_parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        }
+
+        if (empty($path)) {
+            return false;
+        }
+
+        $base = $this->get_geo_base();
+        $path = trailingslashit($path);
+        $prefix = '/' . trailingslashit($base);
+
+        return strpos($path, $prefix) === 0;
     }
 }
