@@ -86,6 +86,67 @@ function geo_discovery_register_settings() {
 add_action('admin_init', 'geo_discovery_register_settings');
 
 /**
+ * Output structured data for the GEO MBA landing page.
+ */
+function geo_discovery_output_structured_data() {
+    if (get_query_var('geo_discovery') !== 'mba_broad') {
+        return;
+    }
+
+    $canonical_url = esc_url(get_option('geo_discovery_mba_url', 'https://example.com/mba'));
+
+    // Course schema for the MBA landing page.
+    $course_schema = array(
+        '@context' => 'https://schema.org',
+        '@type' => 'Course',
+        'name' => 'MBA',
+        'provider' => array(
+            '@type' => 'Organization',
+            'name' => 'Berlin School of Business and Innovation',
+        ),
+        'description' => 'Explore a broad MBA programme designed to accelerate your leadership journey.',
+        'url' => $canonical_url,
+    );
+
+    // FAQPage schema for the MBA landing page FAQs.
+    $faq_schema = array(
+        '@context' => 'https://schema.org',
+        '@type' => 'FAQPage',
+        'mainEntity' => array(
+            array(
+                '@type' => 'Question',
+                'name' => 'Who is this MBA designed for?',
+                'acceptedAnswer' => array(
+                    '@type' => 'Answer',
+                    'text' => 'Professionals seeking to expand their strategic and leadership skills.',
+                ),
+            ),
+            array(
+                '@type' => 'Question',
+                'name' => 'What career outcomes can I expect?',
+                'acceptedAnswer' => array(
+                    '@type' => 'Answer',
+                    'text' => 'Graduates pursue roles in consulting, tech, finance, and entrepreneurship.',
+                ),
+            ),
+            array(
+                '@type' => 'Question',
+                'name' => 'How do I learn more about admissions?',
+                'acceptedAnswer' => array(
+                    '@type' => 'Answer',
+                    'text' => 'Visit the canonical MBA page for requirements and deadlines.',
+                ),
+            ),
+        ),
+    );
+
+    $schema = array($course_schema, $faq_schema);
+
+    echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+}
+add_action('wp_head', 'geo_discovery_output_structured_data');
+
+/**
  * Render the settings field for the canonical MBA URL.
  */
 function geo_discovery_render_mba_url_field() {
