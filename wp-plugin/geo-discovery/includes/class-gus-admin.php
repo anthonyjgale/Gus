@@ -437,6 +437,8 @@ class Gus_Admin {
             $generated_at_label = 'Not generated';
             $grounding_notes = '';
             $block_sources = null;
+            $schema_version_label = 'Not generated';
+            $validation_errors = array();
 
             if (is_array($grounding)) {
                 if (!empty($grounding['mode'])) {
@@ -451,6 +453,14 @@ class Gus_Admin {
                 if (isset($grounding['block_sources']) && is_array($grounding['block_sources'])) {
                     $block_sources = $grounding['block_sources'];
                 }
+
+                if (!empty($grounding['schema_version'])) {
+                    $schema_version_label = (string) $grounding['schema_version'];
+                }
+
+                if (isset($grounding['validation_errors']) && is_array($grounding['validation_errors'])) {
+                    $validation_errors = $grounding['validation_errors'];
+                }
             }
 
             $generation_version_label = !empty($generation_version) ? $generation_version : 'Not generated';
@@ -461,6 +471,7 @@ class Gus_Admin {
             <p><strong>Generated at:</strong> <?php echo esc_html($generated_at_label); ?></p>
             <p><strong>Last generated:</strong> <?php echo esc_html($last_generated_label); ?></p>
             <p><strong>Generation version:</strong> <?php echo esc_html($generation_version_label); ?></p>
+            <p><strong>Schema version:</strong> <?php echo esc_html($schema_version_label); ?></p>
 
             <h3>Source URLs</h3>
             <?php if (!empty($source_urls)) : ?>
@@ -481,6 +492,13 @@ class Gus_Admin {
                 <pre><?php echo esc_html(wp_json_encode($block_sources, JSON_PRETTY_PRINT)); ?></pre>
             <?php else : ?>
                 <p>Not generated.</p>
+            <?php endif; ?>
+
+            <h3>Validation Errors</h3>
+            <?php if (!empty($validation_errors)) : ?>
+                <pre><?php echo esc_html(wp_json_encode($validation_errors, JSON_PRETTY_PRINT)); ?></pre>
+            <?php else : ?>
+                <p>None</p>
             <?php endif; ?>
         </div>
         <?php
