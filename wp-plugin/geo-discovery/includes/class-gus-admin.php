@@ -137,7 +137,14 @@ class Gus_Admin {
         $post_types = $this->routing->get_enabled_post_types();
         $entities = $this->get_entities($post_types);
         $tier_labels = Gus_Utils::get_tier_labels();
+        $status_labels = Gus_Utils::get_status_labels();
         $geo_base = $this->routing->get_geo_base();
+        $valid_statuses = array_keys($status_labels);
+        $status_order = array(
+            Gus_Utils::STATUS_DRAFT,
+            Gus_Utils::STATUS_NEEDS_REVIEW,
+            Gus_Utils::STATUS_PUBLISHED,
+        );
         ?>
         <div class="wrap">
             <h1>GUS Entities</h1>
@@ -164,7 +171,7 @@ class Gus_Admin {
                                 <?php
                                 $enabled = (bool) get_post_meta($entity->ID, '_gus_enabled', true);
                                 $status = get_post_meta($entity->ID, '_gus_status', true);
-                                $status = in_array($status, array('draft', 'published', 'needs_review'), true) ? $status : 'draft';
+                                $status = in_array($status, $valid_statuses, true) ? $status : Gus_Utils::STATUS_DRAFT;
                                 $tiers = get_post_meta($entity->ID, '_gus_tiers_enabled', true);
                                 if (!is_array($tiers)) {
                                     $tiers = array();
@@ -185,9 +192,11 @@ class Gus_Admin {
                                     </td>
                                     <td>
                                         <select name="entities[<?php echo esc_attr($entity->ID); ?>][status]">
-                                            <option value="draft" <?php selected($status, 'draft'); ?>>Draft</option>
-                                            <option value="published" <?php selected($status, 'published'); ?>>Published</option>
-                                            <option value="needs_review" <?php selected($status, 'needs_review'); ?>>Needs review</option>
+                                            <?php foreach ($status_order as $status_key) : ?>
+                                                <option value="<?php echo esc_attr($status_key); ?>" <?php selected($status, $status_key); ?>>
+                                                    <?php echo esc_html($status_labels[$status_key]); ?>
+                                                </option>
+                                            <?php endforeach; ?>
                                         </select>
                                     </td>
                                     <td>
@@ -302,7 +311,7 @@ class Gus_Admin {
     }
 
     private function get_preview_links(WP_Post $post, $tiers, $status, $geo_base, $tier_labels) {
-        if ($status !== 'published') {
+        if ($status !== Gus_Utils::STATUS_PUBLISHED) {
             return '';
         }
 
@@ -358,6 +367,11 @@ class Gus_Admin {
 
         $entities = isset($_POST['entities']) ? (array) $_POST['entities'] : array();
         $generate_post_id = isset($_POST['gus_generate_blocks']) ? absint($_POST['gus_generate_blocks']) : 0;
+        $valid_statuses = array(
+            Gus_Utils::STATUS_DRAFT,
+            Gus_Utils::STATUS_NEEDS_REVIEW,
+            Gus_Utils::STATUS_PUBLISHED,
+        );
 
         foreach ($entities as $post_id => $data) {
             $post_id = absint($post_id);
@@ -367,7 +381,11 @@ class Gus_Admin {
 
             $enabled = !empty($data['enabled']) ? 1 : 0;
             $current_status = get_post_meta($post_id, '_gus_status', true);
-            $status = isset($data['status']) && in_array($data['status'], array('draft', 'published', 'needs_review'), true) ? $data['status'] : 'draft';
+            $status = isset($data['status']) ? (string) $data['status'] : '';
+            $status_is_valid = in_array($status, $valid_statuses, true);
+            if (!$status_is_valid) {
+                $status = $enabled ? Gus_Utils::STATUS_NEEDS_REVIEW : Gus_Utils::STATUS_DRAFT;
+            }
             $tiers = array();
 
             if (isset($data['tiers']) && is_array($data['tiers'])) {
@@ -378,8 +396,12 @@ class Gus_Admin {
                 }
             }
 
-            if ($generate_post_id === $post_id && $current_status === 'published') {
-                $status = 'needs_review';
+            if ($generate_post_id === $post_id && $current_status === Gus_Utils::STATUS_PUBLISHED) {
+                $status = Gus_Utils::STATUS_NEEDS_REVIEW;
+            }
+
+            if ($status === Gus_Utils::STATUS_PUBLISHED && (!$enabled || empty($tiers))) {
+                $status = Gus_Utils::STATUS_NEEDS_REVIEW;
             }
 
             update_post_meta($post_id, '_gus_enabled', $enabled);
@@ -420,6 +442,10 @@ class Gus_Admin {
                 echo '</div>';
                 return;
             }
+
+            $status = get_post_meta($post_id, '_gus_status', true);
+            $status_labels = Gus_Utils::get_status_labels();
+            $status = in_array($status, array_keys($status_labels), true) ? $status : Gus_Utils::STATUS_DRAFT;
 
             $grounding = get_post_meta($post_id, Gus_Utils::META_GROUNDING_PREFIX . $tier, true);
             $source_urls = get_post_meta($post_id, Gus_Utils::META_SOURCE_URLS_PREFIX . $tier, true);
@@ -473,6 +499,7 @@ class Gus_Admin {
             ?>
             <h2><?php echo esc_html($post->post_title); ?> <small>(<?php echo esc_html($post->post_type); ?>)</small></h2>
             <p><strong>Tier:</strong> <?php echo esc_html($tier); ?></p>
+            <p><strong>Status:</strong> <?php echo esc_html($status_labels[$status]); ?></p>
             <p><strong>Mode:</strong> <?php echo esc_html($mode); ?></p>
             <p><strong>Generated at:</strong> <?php echo esc_html($generated_at_label); ?></p>
             <p><strong>Last generated:</strong> <?php echo esc_html($last_generated_label); ?></p>

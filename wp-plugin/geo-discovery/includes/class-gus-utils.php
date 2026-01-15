@@ -11,6 +11,9 @@ class Gus_Utils {
     const META_SOURCE_URLS_PREFIX = '_gus_source_urls_';
     const GENERATION_VERSION_GENERATOR_PLACEHOLDER = 'v1-generator-placeholder';
     const GENERATION_VERSION_RENDERER_PLACEHOLDER = 'v1-renderer-placeholder';
+    const STATUS_DRAFT = 'draft';
+    const STATUS_NEEDS_REVIEW = 'needs_review';
+    const STATUS_PUBLISHED = 'published';
 
     /**
      * @deprecated 1.2.0 Use Gus_Block_Schema::build_placeholder_blocks() instead.
@@ -24,6 +27,14 @@ class Gus_Utils {
             'broad' => 'Broad',
             'mid' => 'Mid',
             'ultra' => 'Ultra',
+        );
+    }
+
+    public static function get_status_labels(): array {
+        return array(
+            self::STATUS_DRAFT => 'Draft',
+            self::STATUS_NEEDS_REVIEW => 'Needs review',
+            self::STATUS_PUBLISHED => 'Published',
         );
     }
 }
