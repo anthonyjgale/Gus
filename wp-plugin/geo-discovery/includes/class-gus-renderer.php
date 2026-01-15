@@ -105,7 +105,7 @@ class Gus_Renderer {
             update_post_meta($post->ID, Gus_Utils::META_GROUNDING_PREFIX . $tier, $grounding);
             update_post_meta($post->ID, Gus_Utils::META_SOURCE_URLS_PREFIX . $tier, $source_urls);
             update_post_meta($post->ID, Gus_Utils::META_LAST_GENERATED_PREFIX . $tier, $timestamp);
-            update_post_meta($post->ID, Gus_Utils::META_GENERATION_VERSION, 'v1-renderer-placeholder');
+            update_post_meta($post->ID, Gus_Utils::META_GENERATION_VERSION, Gus_Utils::GENERATION_VERSION_RENDERER_PLACEHOLDER);
         }
 
         $blocks_by_type = array();

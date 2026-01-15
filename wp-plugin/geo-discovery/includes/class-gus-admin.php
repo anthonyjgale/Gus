@@ -464,13 +464,19 @@ class Gus_Admin {
             }
 
             $generation_version_label = !empty($generation_version) ? $generation_version : 'Not generated';
+            $generation_version_suffix = '';
+            if ($generation_version === Gus_Utils::GENERATION_VERSION_RENDERER_PLACEHOLDER) {
+                $generation_version_suffix = ' (renderer repair)';
+            } elseif ($generation_version === Gus_Utils::GENERATION_VERSION_GENERATOR_PLACEHOLDER) {
+                $generation_version_suffix = ' (manual generate)';
+            }
             ?>
             <h2><?php echo esc_html($post->post_title); ?> <small>(<?php echo esc_html($post->post_type); ?>)</small></h2>
             <p><strong>Tier:</strong> <?php echo esc_html($tier); ?></p>
             <p><strong>Mode:</strong> <?php echo esc_html($mode); ?></p>
             <p><strong>Generated at:</strong> <?php echo esc_html($generated_at_label); ?></p>
             <p><strong>Last generated:</strong> <?php echo esc_html($last_generated_label); ?></p>
-            <p><strong>Generation version:</strong> <?php echo esc_html($generation_version_label); ?></p>
+            <p><strong>Generation version:</strong> <?php echo esc_html($generation_version_label . $generation_version_suffix); ?></p>
             <p><strong>Schema version:</strong> <?php echo esc_html($schema_version_label); ?></p>
 
             <h3>Source URLs</h3>

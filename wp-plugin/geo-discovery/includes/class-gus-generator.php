@@ -54,7 +54,7 @@ class Gus_Generator {
         update_post_meta($post_id, Gus_Utils::META_GROUNDING_PREFIX . $tier, $grounding);
         update_post_meta($post_id, Gus_Utils::META_SOURCE_URLS_PREFIX . $tier, $source_urls);
         update_post_meta($post_id, Gus_Utils::META_LAST_GENERATED_PREFIX . $tier, $timestamp);
-        update_post_meta($post_id, Gus_Utils::META_GENERATION_VERSION, 'v1-placeholder-blocks');
+        update_post_meta($post_id, Gus_Utils::META_GENERATION_VERSION, Gus_Utils::GENERATION_VERSION_GENERATOR_PLACEHOLDER);
 
         return array(
             'blocks' => $blocks,
