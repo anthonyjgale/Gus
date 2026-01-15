@@ -69,8 +69,50 @@ class Gus_Renderer {
         nocache_headers();
 
         $blocks = get_post_meta($post->ID, '_gus_blocks_' . $tier, true);
-        if (!is_array($blocks)) {
-            $blocks = array();
+        $blocks = is_array($blocks) ? $blocks : array();
+        $is_legacy = $this->is_legacy_blocks($blocks);
+        $needs_repair = $is_legacy || empty($blocks);
+        if (!$needs_repair) {
+            $validation = Gus_Block_Schema::validate_blocks($blocks, $tier);
+            $needs_repair = !$validation['ok'];
+        }
+
+        if ($needs_repair) {
+            Gus_Generator::generate($post->ID, $tier);
+            $blocks = get_post_meta($post->ID, '_gus_blocks_' . $tier, true);
+            $blocks = is_array($blocks) ? $blocks : array();
+        }
+
+        $validation = Gus_Block_Schema::validate_blocks($blocks, $tier);
+        if (!$validation['ok']) {
+            $blocks = Gus_Block_Schema::build_placeholder_blocks($post, $tier);
+            $timestamp = time();
+            $permalink = get_permalink($post);
+            $source_urls = array();
+            if (!empty($permalink)) {
+                $source_urls[] = $permalink;
+            }
+            $grounding = array(
+                'mode' => 'placeholder',
+                'generated_at' => $timestamp,
+                'tier' => $tier,
+                'block_sources' => array(),
+                'notes' => 'Renderer fallback applied after validation failure.',
+                'schema_version' => Gus_Block_Schema::get_schema_version(),
+                'validation_errors' => $validation['errors'],
+            );
+            update_post_meta($post->ID, '_gus_blocks_' . $tier, $blocks);
+            update_post_meta($post->ID, Gus_Utils::META_GROUNDING_PREFIX . $tier, $grounding);
+            update_post_meta($post->ID, Gus_Utils::META_SOURCE_URLS_PREFIX . $tier, $source_urls);
+            update_post_meta($post->ID, Gus_Utils::META_LAST_GENERATED_PREFIX . $tier, $timestamp);
+            update_post_meta($post->ID, Gus_Utils::META_GENERATION_VERSION, 'v1-renderer-placeholder');
+        }
+
+        $blocks_by_type = array();
+        foreach ($blocks as $block) {
+            if (is_array($block) && isset($block['type'])) {
+                $blocks_by_type[$block['type']] = $block;
+            }
         }
 
         $tier_labels = Gus_Utils::get_tier_labels();
@@ -94,5 +136,19 @@ class Gus_Renderer {
         return array_values(array_filter($post_types, static function ($post_type) {
             return is_string($post_type) && $post_type !== '';
         }));
+    }
+
+    private function is_legacy_blocks(array $blocks) {
+        if (empty($blocks)) {
+            return false;
+        }
+
+        foreach ($blocks as $block) {
+            if (!is_string($block)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
