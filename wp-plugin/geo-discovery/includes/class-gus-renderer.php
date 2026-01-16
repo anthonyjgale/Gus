@@ -28,7 +28,7 @@ class Gus_Renderer {
                     ),
                     array(
                         'key' => '_gus_status',
-                        'value' => 'published',
+                        'value' => Gus_Utils::STATUS_PUBLISHED,
                     ),
                 ),
             )

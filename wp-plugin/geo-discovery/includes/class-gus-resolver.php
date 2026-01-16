@@ -19,12 +19,22 @@ class Gus_Resolver {
     }
 
     public function is_entity_published(WP_Post $post) {
-        $status = get_post_meta($post->ID, '_gus_status', true);
-        return $status === 'published';
+        return $this->get_entity_status($post) === Gus_Utils::STATUS_PUBLISHED;
     }
 
     public function passes_governance(WP_Post $post): bool {
-        return $this->is_entity_enabled($post) && $this->is_entity_published($post);
+        return $this->is_entity_enabled($post) && $this->get_entity_status($post) === Gus_Utils::STATUS_PUBLISHED;
+    }
+
+    public function get_entity_status(WP_Post $post): string {
+        $status = get_post_meta($post->ID, '_gus_status', true);
+        $valid_statuses = array(
+            Gus_Utils::STATUS_DRAFT,
+            Gus_Utils::STATUS_NEEDS_REVIEW,
+            Gus_Utils::STATUS_PUBLISHED,
+        );
+
+        return in_array($status, $valid_statuses, true) ? $status : Gus_Utils::STATUS_DRAFT;
     }
 
     public function get_enabled_tiers(WP_Post $post): array {
